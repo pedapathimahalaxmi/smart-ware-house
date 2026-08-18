@@ -1,0 +1,2058 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlowForge AI — Smart Warehouse Operations & Order Fulfillment System</title>
+  <meta name="description" content="Autonomous AI-driven warehouse control tower, dynamic stock allocation arbitration, multi-tier SLA queue, picking bottleneck resolution, and operational exception center." />
+  <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', '-apple-system', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            slate: {
+              850: '#111827',
+              900: '#0b1120',
+              950: '#060a12',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    :root {
+      color-scheme: dark;
+    }
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      background-color: #060a12;
+      color: #f1f5f9;
+      font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+      margin: 0;
+      padding: 0;
+      overflow-x: hidden;
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(11, 17, 32, 0.6);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(51, 65, 85, 0.8);
+      border-radius: 9999px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(100, 116, 139, 1);
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.98); }
+      to { opacity: 1; transform: scale(1); }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(16px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .animate-slide-up {
+      animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen">
+  <div id="app" class="flex min-h-screen w-full"></div>
+  <div id="modal-root"></div>
+  <div id="toast-root" class="fixed top-5 right-5 z-50 flex flex-col space-y-2 max-w-md w-full pointer-events-none"></div>
+
+  <!-- Pure Standalone Reactive Application Script (Zero CDN dependency, Instant Execution) -->
+  <script>
+    (function() {
+      // --- Web Audio Synthesizer ---
+      class SoundEngine {
+        constructor() {
+          this.ctx = null;
+          this.enabled = true;
+        }
+        init() {
+          if (!this.ctx) {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtx) this.ctx = new AudioCtx();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+        }
+        playClick() {
+          if (!this.enabled) return;
+          try {
+            this.init();
+            if (!this.ctx) return;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(400, this.ctx.currentTime + 0.04);
+            gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 0.04);
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + 0.04);
+          } catch(e) {}
+        }
+        playSuccess() {
+          if (!this.enabled) return;
+          try {
+            this.init();
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+              const osc = this.ctx.createOscillator();
+              const gain = this.ctx.createGain();
+              osc.type = 'triangle';
+              osc.frequency.setValueAtTime(freq, now + idx * 0.06);
+              gain.gain.setValueAtTime(0, now + idx * 0.06);
+              gain.gain.linearRampToValueAtTime(0.12, now + idx * 0.06 + 0.02);
+              gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.06 + 0.35);
+              osc.connect(gain);
+              gain.connect(this.ctx.destination);
+              osc.start(now + idx * 0.06);
+              osc.stop(now + idx * 0.06 + 0.35);
+            });
+          } catch(e) {}
+        }
+      }
+      const sound = new SoundEngine();
+
+      // --- INITIAL DATA STATE ---
+      const state = {
+        activePage: 'dashboard',
+        soundEnabled: true,
+        simMinutes: 614,
+        tourActive: false,
+        tourStep: 0,
+        orderSearch: '',
+        orderPriorityFilter: 'ALL',
+        invSearch: '',
+        invZoneFilter: 'ALL',
+        pickingZoneFilter: 'ALL',
+        
+        // Active Modals
+        selectedOrder: null,
+        reorderItem: null,
+        reorderQty: 25,
+        reassignTask: null,
+        selectedPickerTarget: 'PCK-02',
+        resolveException: null,
+        resolveOption: 'recommended',
+
+        toasts: [],
+
+        inventory: [
+          { sku: 'SKU-1001', name: 'Industrial High-Torque Servo Motor', category: 'Motion Control', zone: 'A1', binLocation: 'A1-R04-B02', onHand: 12, reserved: 5, available: 7, reorderLevel: 15, unitCost: 450, leadTimeDays: 3, status: 'Low Stock' },
+          { sku: 'SKU-1002', name: 'Micro-Controller Logic Board V4', category: 'Electronics', zone: 'A2', binLocation: 'A2-R02-B11', onHand: 48, reserved: 12, available: 36, reorderLevel: 20, unitCost: 185, leadTimeDays: 5, status: 'Healthy' },
+          { sku: 'SKU-1003', name: 'Optical Laser Sensor Pro', category: 'Sensors', zone: 'A1', binLocation: 'A1-R01-B08', onHand: 8, reserved: 6, available: 2, reorderLevel: 10, unitCost: 320, leadTimeDays: 4, status: 'Low Stock' },
+          { sku: 'SKU-1004', name: 'Precision Pneumatic Actuator', category: 'Pneumatics', zone: 'B1', binLocation: 'B1-R06-B03', onHand: 9, reserved: 4, available: 5, reorderLevel: 12, unitCost: 290, leadTimeDays: 3, status: 'Low Stock' },
+          { sku: 'SKU-1005', name: 'Heavy-Duty Hydraulic Coupling', category: 'Hydraulics', zone: 'B2', binLocation: 'B2-R03-B01', onHand: 4, reserved: 3, available: 1, reorderLevel: 15, unitCost: 520, leadTimeDays: 7, status: 'Low Stock' },
+          { sku: 'SKU-1006', name: 'Fiber Optic Transceiver 100G', category: 'Networking', zone: 'C1', binLocation: 'C1-R01-B14', onHand: 65, reserved: 18, available: 47, reorderLevel: 25, unitCost: 140, leadTimeDays: 2, status: 'Healthy' },
+          { sku: 'SKU-1007', name: 'Titanium Linear Guide Rail 1.2m', category: 'Mechanical', zone: 'B1', binLocation: 'B1-R08-B05', onHand: 14, reserved: 6, available: 8, reorderLevel: 16, unitCost: 380, leadTimeDays: 6, status: 'Low Stock' },
+          { sku: 'SKU-1008', name: 'Brushless DC Motor 48V (Standard)', category: 'Motion Control', zone: 'A2', binLocation: 'A2-R05-B04', onHand: 2, reserved: 2, available: 0, reorderLevel: 10, unitCost: 275, leadTimeDays: 4, status: 'Damaged' },
+          { sku: 'SKU-1009', name: 'Modular Conveyor Roller Pack', category: 'Conveyor', zone: 'B2', binLocation: 'B2-R05-B08', onHand: 88, reserved: 28, available: 60, reorderLevel: 30, unitCost: 95, leadTimeDays: 3, status: 'Healthy' },
+          { sku: 'SKU-1010', name: 'Brushless DC Motor 48V (Rev B Compatible)', category: 'Motion Control', zone: 'A2', binLocation: 'A2-R05-B05', onHand: 26, reserved: 4, available: 22, reorderLevel: 8, unitCost: 285, leadTimeDays: 3, status: 'Healthy' },
+          { sku: 'SKU-1011', name: 'Smart RFID Warehouse Asset Tag (x50)', category: 'Electronics', zone: 'C1', binLocation: 'C1-R04-B02', onHand: 240, reserved: 60, available: 180, reorderLevel: 50, unitCost: 45, leadTimeDays: 2, status: 'Healthy' },
+          { sku: 'SKU-1012', name: 'High-Speed Stepper Driver Shield', category: 'Electronics', zone: 'A1', binLocation: 'A1-R03-B07', onHand: 16, reserved: 9, available: 7, reorderLevel: 12, unitCost: 165, leadTimeDays: 4, status: 'Low Stock' },
+          { sku: 'SKU-1013', name: 'Thermal Imaging Sensor 4K Core', category: 'Sensors', zone: 'C1', binLocation: 'C1-R02-B09', onHand: 5, reserved: 5, available: 0, reorderLevel: 8, unitCost: 890, leadTimeDays: 8, status: 'Out of Stock' },
+          { sku: 'SKU-1014', name: 'Carbon Fiber Robotic Arm Joint', category: 'Robotics', zone: 'B1', binLocation: 'B1-R02-B01', onHand: 22, reserved: 6, available: 16, reorderLevel: 10, unitCost: 740, leadTimeDays: 5, status: 'Healthy' },
+          { sku: 'SKU-1015', name: 'Industrial Managed Switch 24-Port', category: 'Networking', zone: 'C1', binLocation: 'C1-R05-B06', onHand: 34, reserved: 10, available: 24, reorderLevel: 15, unitCost: 610, leadTimeDays: 4, status: 'Healthy' },
+          { sku: 'SKU-1016', name: 'Heavy Payload Caster Wheel Set', category: 'Hardware', zone: 'B2', binLocation: 'B2-R01-B12', onHand: 7, reserved: 5, available: 2, reorderLevel: 14, unitCost: 135, leadTimeDays: 3, status: 'Low Stock' }
+        ],
+
+        orders: [
+          {
+            id: 'ORD-1042',
+            customerName: 'Apex Robotics International',
+            customerTier: 'Enterprise',
+            createdAt: '10:14 AM',
+            slaDeadline: '11:00 AM',
+            minutesRemaining: 46,
+            priority: 'Critical',
+            priorityScore: 96,
+            priorityFactors: { tierScore: 40, slaScore: 35, valueScore: 15, urgencyScore: 6 },
+            items: [
+              { sku: 'SKU-1001', name: 'Industrial High-Torque Servo Motor', quantityRequested: 10, quantityAllocated: 7, unitPrice: 450, zone: 'A1' },
+              { sku: 'SKU-1014', name: 'Carbon Fiber Robotic Arm Joint', quantityRequested: 4, quantityAllocated: 4, unitPrice: 740, zone: 'B1' }
+            ],
+            totalValue: 7460,
+            allocationStatus: 'Conflict Detected',
+            fulfillmentStatus: 'Created',
+            zone: 'A1',
+            notes: 'Critical line-down order for assembly plant. Requires 10 units SKU-1001. Only 7 available on shelf.',
+            history: [
+              { timestamp: '10:14 AM', event: 'Order ingested via EDI Gateway', actor: 'System' },
+              { timestamp: '10:15 AM', event: 'Classified as CRITICAL (Score 96)', actor: 'AI Engine' },
+              { timestamp: '10:15 AM', event: 'Stock conflict detected: 3 units SKU-1001 deficit', actor: 'Allocation Engine' }
+            ]
+          },
+          {
+            id: 'ORD-1037',
+            customerName: 'Global Retail Parts LLC',
+            customerTier: 'Standard',
+            createdAt: '08:30 AM',
+            slaDeadline: '04:30 PM',
+            minutesRemaining: 270,
+            priority: 'Normal',
+            priorityScore: 38,
+            priorityFactors: { tierScore: 10, slaScore: 10, valueScore: 8, urgencyScore: 10 },
+            items: [
+              { sku: 'SKU-1001', name: 'Industrial High-Torque Servo Motor', quantityRequested: 5, quantityAllocated: 5, unitPrice: 450, zone: 'A1' },
+              { sku: 'SKU-1002', name: 'Micro-Controller Logic Board V4', quantityRequested: 4, quantityAllocated: 4, unitPrice: 185, zone: 'A2' }
+            ],
+            totalValue: 2990,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Allocated',
+            zone: 'A1',
+            notes: 'Standard replenishment order. Holds 5 reserved units of SKU-1001.',
+            history: [{ timestamp: '08:30 AM', event: 'Order received via Storefront', actor: 'Customer' }]
+          },
+          {
+            id: 'ORD-1045',
+            customerName: 'BioHealth ColdChain Logistics',
+            customerTier: 'Enterprise',
+            createdAt: '09:45 AM',
+            slaDeadline: '10:45 AM',
+            minutesRemaining: 31,
+            priority: 'Critical',
+            priorityScore: 94,
+            priorityFactors: { tierScore: 40, slaScore: 35, valueScore: 12, urgencyScore: 7 },
+            items: [{ sku: 'SKU-1004', name: 'Precision Pneumatic Actuator', quantityRequested: 8, quantityAllocated: 5, unitPrice: 290, zone: 'B1' }],
+            totalValue: 2320,
+            allocationStatus: 'Conflict Detected',
+            fulfillmentStatus: 'Created',
+            zone: 'B1',
+            notes: 'Vaccine distribution freezer repair unit. Deficit of 3 units.',
+            history: [{ timestamp: '09:45 AM', event: 'Ingested via Priority API', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1048',
+            customerName: 'AeroTech Defense Systems',
+            customerTier: 'Enterprise',
+            createdAt: '10:05 AM',
+            slaDeadline: '11:30 AM',
+            minutesRemaining: 76,
+            priority: 'High',
+            priorityScore: 82,
+            priorityFactors: { tierScore: 40, slaScore: 20, valueScore: 15, urgencyScore: 7 },
+            items: [{ sku: 'SKU-1007', name: 'Titanium Linear Guide Rail 1.2m', quantityRequested: 12, quantityAllocated: 8, unitPrice: 380, zone: 'B1' }],
+            totalValue: 4560,
+            allocationStatus: 'Conflict Detected',
+            fulfillmentStatus: 'Created',
+            zone: 'B1',
+            notes: 'Avionics manufacturing line requirement. Deficit of 4 units.',
+            history: [{ timestamp: '10:05 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1031',
+            customerName: 'Quantum Dynamics Corp',
+            customerTier: 'Premium',
+            createdAt: '08:15 AM',
+            slaDeadline: '09:45 AM',
+            minutesRemaining: -29,
+            priority: 'High',
+            priorityScore: 85,
+            priorityFactors: { tierScore: 25, slaScore: 35, valueScore: 15, urgencyScore: 10 },
+            items: [
+              { sku: 'SKU-1005', name: 'Heavy-Duty Hydraulic Coupling', quantityRequested: 2, quantityAllocated: 2, unitPrice: 520, zone: 'B2' },
+              { sku: 'SKU-1009', name: 'Modular Conveyor Roller Pack', quantityRequested: 6, quantityAllocated: 6, unitPrice: 95, zone: 'B2' }
+            ],
+            totalValue: 1610,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Picking',
+            assignedPicker: 'Marcus Vance',
+            zone: 'B2',
+            notes: 'DELAYED: Heavy obstruction in Zone B2 aisle 3.',
+            history: [{ timestamp: '08:15 AM', event: 'Order Ingested', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1032',
+            customerName: 'NeuroLink Sensor Systems',
+            customerTier: 'Premium',
+            createdAt: '08:20 AM',
+            slaDeadline: '10:00 AM',
+            minutesRemaining: -14,
+            priority: 'High',
+            priorityScore: 79,
+            priorityFactors: { tierScore: 25, slaScore: 35, valueScore: 10, urgencyScore: 9 },
+            items: [{ sku: 'SKU-1016', name: 'Heavy Payload Caster Wheel Set', quantityRequested: 4, quantityAllocated: 4, unitPrice: 135, zone: 'B2' }],
+            totalValue: 540,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Picking',
+            assignedPicker: 'Kenji Takahashi',
+            zone: 'B2',
+            notes: 'DELAYED: Picker overloaded in Zone B2.',
+            history: [{ timestamp: '08:20 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1033',
+            customerName: 'Tesla Gigafactory Tier 1',
+            customerTier: 'Enterprise',
+            createdAt: '08:40 AM',
+            slaDeadline: '11:15 AM',
+            minutesRemaining: 61,
+            priority: 'Critical',
+            priorityScore: 91,
+            priorityFactors: { tierScore: 40, slaScore: 25, valueScore: 16, urgencyScore: 10 },
+            items: [{ sku: 'SKU-1008', name: 'Brushless DC Motor 48V (Standard)', quantityRequested: 2, quantityAllocated: 2, unitPrice: 275, zone: 'A2' }],
+            totalValue: 550,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'On Hold',
+            assignedPicker: 'Tariq Al-Mansoor',
+            zone: 'A2',
+            notes: 'EXCEPTION: Unit damaged during picking. Awaiting SKU-1010 substitution approval.',
+            history: [{ timestamp: '08:40 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1034',
+            customerName: 'Vertex Semiconductor',
+            customerTier: 'Enterprise',
+            createdAt: '08:50 AM',
+            slaDeadline: '12:00 PM',
+            minutesRemaining: 106,
+            priority: 'High',
+            priorityScore: 84,
+            priorityFactors: { tierScore: 40, slaScore: 20, valueScore: 18, urgencyScore: 6 },
+            items: [
+              { sku: 'SKU-1006', name: 'Fiber Optic Transceiver 100G', quantityRequested: 15, quantityAllocated: 15, unitPrice: 140, zone: 'C1' },
+              { sku: 'SKU-1015', name: 'Industrial Managed Switch 24-Port', quantityRequested: 2, quantityAllocated: 2, unitPrice: 610, zone: 'C1' }
+            ],
+            totalValue: 3320,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Packed',
+            assignedPicker: 'Maya Patel',
+            zone: 'C1',
+            notes: 'Packed into Box-C94. Awaiting final QC barcode scan.',
+            history: [{ timestamp: '08:50 AM', event: 'Order Ingested', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1035',
+            customerName: 'OmniTrade Machinery',
+            customerTier: 'Standard',
+            createdAt: '09:00 AM',
+            slaDeadline: '05:00 PM',
+            minutesRemaining: 306,
+            priority: 'Normal',
+            priorityScore: 42,
+            priorityFactors: { tierScore: 10, slaScore: 10, valueScore: 12, urgencyScore: 10 },
+            items: [{ sku: 'SKU-1007', name: 'Titanium Linear Guide Rail 1.2m', quantityRequested: 6, quantityAllocated: 6, unitPrice: 380, zone: 'B1' }],
+            totalValue: 2280,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Allocated',
+            zone: 'B1',
+            notes: 'Standard queue. Holding 6 units of SKU-1007.',
+            history: [{ timestamp: '09:00 AM', event: 'Order Ingested', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1036',
+            customerName: 'Spectra Optics Labs',
+            customerTier: 'Premium',
+            createdAt: '09:10 AM',
+            slaDeadline: '01:30 PM',
+            minutesRemaining: 196,
+            priority: 'Normal',
+            priorityScore: 58,
+            priorityFactors: { tierScore: 25, slaScore: 15, valueScore: 12, urgencyScore: 6 },
+            items: [{ sku: 'SKU-1013', name: 'Thermal Imaging Sensor 4K Core', quantityRequested: 2, quantityAllocated: 2, unitPrice: 890, zone: 'C1' }],
+            totalValue: 1780,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'On Hold',
+            zone: 'C1',
+            notes: 'EXCEPTION EX-902: Physical bin discrepancy in C1-R02-B09.',
+            history: [{ timestamp: '09:10 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1038',
+            customerName: 'Nordic Automation AB',
+            customerTier: 'Enterprise',
+            createdAt: '07:50 AM',
+            slaDeadline: '10:30 AM',
+            minutesRemaining: 16,
+            priority: 'Critical',
+            priorityScore: 92,
+            priorityFactors: { tierScore: 40, slaScore: 35, valueScore: 10, urgencyScore: 7 },
+            items: [
+              { sku: 'SKU-1002', name: 'Micro-Controller Logic Board V4', quantityRequested: 8, quantityAllocated: 8, unitPrice: 185, zone: 'A2' },
+              { sku: 'SKU-1011', name: 'Smart RFID Warehouse Asset Tag (x50)', quantityRequested: 10, quantityAllocated: 10, unitPrice: 45, zone: 'C1' }
+            ],
+            totalValue: 1930,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Quality Check',
+            assignedPicker: 'Elena Rostova',
+            zone: 'A2',
+            notes: 'High-speed line. Inspection in progress.',
+            history: [{ timestamp: '07:50 AM', event: 'Order Ingested', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1039',
+            customerName: 'Pacific Marine Hardware',
+            customerTier: 'Standard',
+            createdAt: '08:00 AM',
+            slaDeadline: '06:00 PM',
+            minutesRemaining: 366,
+            priority: 'Low',
+            priorityScore: 28,
+            priorityFactors: { tierScore: 10, slaScore: 5, valueScore: 8, urgencyScore: 5 },
+            items: [{ sku: 'SKU-1004', name: 'Precision Pneumatic Actuator', quantityRequested: 4, quantityAllocated: 4, unitPrice: 290, zone: 'B1' }],
+            totalValue: 1160,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Allocated',
+            zone: 'B1',
+            notes: 'Holds 4 units SKU-1004 needed by BioHealth ORD-1045.',
+            history: [{ timestamp: '08:00 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1040',
+            customerName: 'Siemens Energy Infra',
+            customerTier: 'Enterprise',
+            createdAt: '07:15 AM',
+            slaDeadline: '09:30 AM',
+            minutesRemaining: -44,
+            priority: 'Critical',
+            priorityScore: 98,
+            priorityFactors: { tierScore: 40, slaScore: 35, valueScore: 18, urgencyScore: 5 },
+            items: [{ sku: 'SKU-1015', name: 'Industrial Managed Switch 24-Port', quantityRequested: 4, quantityAllocated: 4, unitPrice: 610, zone: 'C1' }],
+            totalValue: 2440,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Dispatched',
+            zone: 'C1',
+            notes: 'Dispatched via FedEx Priority Overnight.',
+            history: [{ timestamp: '07:15 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1041',
+            customerName: 'Kuka Robotic Integrations',
+            customerTier: 'Premium',
+            createdAt: '07:30 AM',
+            slaDeadline: '10:00 AM',
+            minutesRemaining: -14,
+            priority: 'High',
+            priorityScore: 81,
+            priorityFactors: { tierScore: 25, slaScore: 35, valueScore: 12, urgencyScore: 9 },
+            items: [{ sku: 'SKU-1012', name: 'High-Speed Stepper Driver Shield', quantityRequested: 5, quantityAllocated: 5, unitPrice: 165, zone: 'A1' }],
+            totalValue: 825,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Dispatched',
+            zone: 'A1',
+            notes: 'Dispatched via DHL Express.',
+            history: [{ timestamp: '07:30 AM', event: 'Order Created', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1043',
+            customerName: 'Amazon Prime Logistics Partner',
+            customerTier: 'Enterprise',
+            createdAt: '08:45 AM',
+            slaDeadline: '12:30 PM',
+            minutesRemaining: 136,
+            priority: 'High',
+            priorityScore: 86,
+            priorityFactors: { tierScore: 40, slaScore: 20, valueScore: 16, urgencyScore: 10 },
+            items: [
+              { sku: 'SKU-1009', name: 'Modular Conveyor Roller Pack', quantityRequested: 10, quantityAllocated: 10, unitPrice: 95, zone: 'B2' },
+              { sku: 'SKU-1011', name: 'Smart RFID Warehouse Asset Tag (x50)', quantityRequested: 20, quantityAllocated: 20, unitPrice: 45, zone: 'C1' }
+            ],
+            totalValue: 1850,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Picking',
+            assignedPicker: 'Sarah Jenkins',
+            zone: 'B1',
+            notes: 'High throughput batch.',
+            history: [{ timestamp: '08:45 AM', event: 'Order Ingested', actor: 'System' }]
+          },
+          {
+            id: 'ORD-1044',
+            customerName: 'HydraTech Dynamics',
+            customerTier: 'Standard',
+            createdAt: '09:20 AM',
+            slaDeadline: '05:30 PM',
+            minutesRemaining: 336,
+            priority: 'Low',
+            priorityScore: 25,
+            priorityFactors: { tierScore: 10, slaScore: 5, valueScore: 5, urgencyScore: 5 },
+            items: [{ sku: 'SKU-1002', name: 'Micro-Controller Logic Board V4', quantityRequested: 2, quantityAllocated: 2, unitPrice: 185, zone: 'A2' }],
+            totalValue: 370,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Allocated',
+            zone: 'A2',
+            notes: 'Low urgency inventory replenishment.',
+            history: [{ timestamp: '09:20 AM', event: 'Order Created', actor: 'System' }]
+          }
+        ],
+
+        pickers: [
+          { id: 'PCK-01', name: 'Marcus Vance', zone: 'B2', activeTasks: 5, maxCapacity: 4, efficiencyRating: 91, currentStatus: 'Overloaded' },
+          { id: 'PCK-02', name: 'Elena Rostova', zone: 'A1', activeTasks: 1, maxCapacity: 4, efficiencyRating: 99, currentStatus: 'Available' },
+          { id: 'PCK-03', name: 'Tariq Al-Mansoor', zone: 'A2', activeTasks: 2, maxCapacity: 4, efficiencyRating: 95, currentStatus: 'Picking' },
+          { id: 'PCK-04', name: 'Sarah Jenkins', zone: 'B1', activeTasks: 1, maxCapacity: 4, efficiencyRating: 97, currentStatus: 'Available' },
+          { id: 'PCK-05', name: 'Kenji Takahashi', zone: 'B2', activeTasks: 4, maxCapacity: 4, efficiencyRating: 89, currentStatus: 'Overloaded' },
+          { id: 'PCK-06', name: 'Maya Patel', zone: 'C1', activeTasks: 1, maxCapacity: 4, efficiencyRating: 98, currentStatus: 'Available' }
+        ],
+
+        tasks: [
+          { id: 'TSK-201', orderId: 'ORD-1031', customerName: 'Quantum Dynamics Corp', pickerName: 'Marcus Vance', pickerId: 'PCK-01', zone: 'B2', itemCount: 8, dueTime: '09:45 AM', minutesRemaining: -29, status: 'Delayed', isBottleneck: true, priority: 'High' },
+          { id: 'TSK-202', orderId: 'ORD-1032', customerName: 'NeuroLink Sensor Systems', pickerName: 'Kenji Takahashi', pickerId: 'PCK-05', zone: 'B2', itemCount: 4, dueTime: '10:00 AM', minutesRemaining: -14, status: 'Delayed', isBottleneck: true, priority: 'High' },
+          { id: 'TSK-203', orderId: 'ORD-1043', customerName: 'Amazon Prime Logistics Partner', pickerName: 'Sarah Jenkins', pickerId: 'PCK-04', zone: 'B1', itemCount: 30, dueTime: '12:30 PM', minutesRemaining: 136, status: 'In Progress', isBottleneck: false, priority: 'High' },
+          { id: 'TSK-204', orderId: 'ORD-1037', customerName: 'Global Retail Parts LLC', pickerName: 'Elena Rostova', pickerId: 'PCK-02', zone: 'A1', itemCount: 9, dueTime: '04:30 PM', minutesRemaining: 270, status: 'Ready', isBottleneck: false, priority: 'Normal' },
+          { id: 'TSK-205', orderId: 'ORD-1035', customerName: 'OmniTrade Machinery', pickerName: 'Sarah Jenkins', pickerId: 'PCK-04', zone: 'B1', itemCount: 6, dueTime: '05:00 PM', minutesRemaining: 306, status: 'Ready', isBottleneck: false, priority: 'Normal' },
+          { id: 'TSK-206', orderId: 'ORD-1044', customerName: 'HydraTech Dynamics', pickerName: 'Tariq Al-Mansoor', pickerId: 'PCK-03', zone: 'A2', itemCount: 2, dueTime: '05:30 PM', minutesRemaining: 336, status: 'Ready', isBottleneck: false, priority: 'Low' },
+          { id: 'TSK-207', orderId: 'ORD-1034', customerName: 'Vertex Semiconductor', pickerName: 'Maya Patel', pickerId: 'PCK-06', zone: 'C1', itemCount: 17, dueTime: '12:00 PM', minutesRemaining: 106, status: 'Packed', isBottleneck: false, priority: 'High' },
+          { id: 'TSK-208', orderId: 'ORD-1038', customerName: 'Nordic Automation AB', pickerName: 'Elena Rostova', pickerId: 'PCK-02', zone: 'A2', itemCount: 18, dueTime: '10:30 AM', minutesRemaining: 16, status: 'Quality Check', isBottleneck: false, priority: 'Critical' }
+        ],
+
+        conflicts: [
+          {
+            id: 'CONF-01',
+            criticalOrderId: 'ORD-1042',
+            criticalCustomer: 'Apex Robotics International',
+            criticalTier: 'Enterprise',
+            criticalSlaMinutes: 46,
+            lowerOrderId: 'ORD-1037',
+            lowerCustomer: 'Global Retail Parts LLC',
+            lowerTier: 'Standard',
+            sku: 'SKU-1001',
+            skuName: 'Industrial High-Torque Servo Motor',
+            unitsNeededByCritical: 10,
+            unitsAvailableOnShelf: 7,
+            unitsReservedByLower: 5,
+            recommendedTransferUnits: 3,
+            explanation: 'ORD-1042 is Critical (SLA 46m) and needs 10 units of SKU-1001. Only 7 units are available on shelf. Lower-priority ORD-1037 currently holds 5 reserved units. Reallocating 3 units fulfills ORD-1042 without jeopardizing ORD-1037 shipping window.',
+            resolved: false
+          },
+          {
+            id: 'CONF-02',
+            criticalOrderId: 'ORD-1045',
+            criticalCustomer: 'BioHealth ColdChain Logistics',
+            criticalTier: 'Enterprise',
+            criticalSlaMinutes: 31,
+            lowerOrderId: 'ORD-1039',
+            lowerCustomer: 'Pacific Marine Hardware',
+            lowerTier: 'Standard',
+            sku: 'SKU-1004',
+            skuName: 'Precision Pneumatic Actuator',
+            unitsNeededByCritical: 8,
+            unitsAvailableOnShelf: 5,
+            unitsReservedByLower: 4,
+            recommendedTransferUnits: 3,
+            explanation: 'ORD-1045 is Critical (SLA 31m) needing 8 units of SKU-1004. Only 5 units are available on shelf. Reallocate 3 units from low-priority ORD-1039 to prevent medical cold-chain penalty.',
+            resolved: false
+          },
+          {
+            id: 'CONF-03',
+            criticalOrderId: 'ORD-1048',
+            criticalCustomer: 'AeroTech Defense Systems',
+            criticalTier: 'Enterprise',
+            criticalSlaMinutes: 76,
+            lowerOrderId: 'ORD-1035',
+            lowerCustomer: 'OmniTrade Machinery',
+            lowerTier: 'Standard',
+            sku: 'SKU-1007',
+            skuName: 'Titanium Linear Guide Rail 1.2m',
+            unitsNeededByCritical: 12,
+            unitsAvailableOnShelf: 8,
+            unitsReservedByLower: 6,
+            recommendedTransferUnits: 4,
+            explanation: 'ORD-1048 needs 12 units of SKU-1007 with only 8 on shelf. Reallocate 4 units from ORD-1035 to meet military defense manufacturing deadline.',
+            resolved: false
+          }
+        ],
+
+        exceptions: [
+          {
+            id: 'EX-901',
+            type: 'damaged_item',
+            orderId: 'ORD-1033',
+            sku: 'SKU-1008',
+            skuName: 'Brushless DC Motor 48V (Standard)',
+            zone: 'A2',
+            pickerName: 'Tariq Al-Mansoor',
+            reportedAt: '09:10 AM',
+            issueDescription: 'Structural casing crack detected on SKU-1008 during picking retrieval at Bin A2-R05-B04.',
+            systemDecision: 'Damaged item marked for RMA quarantine. Automatic pin-compatible SKU substitution suggested.',
+            recommendedResolution: 'Substitute with SKU-1010 (Brushless DC Motor 48V Rev B, 22 units available, 100% fit-form-function compatible) and resume picking immediately.',
+            status: 'Pending Review',
+            impactLevel: 'Critical',
+            substituteSku: 'SKU-1010',
+            substituteName: 'Brushless DC Motor 48V (Rev B Compatible)'
+          },
+          {
+            id: 'EX-902',
+            type: 'missing_item',
+            orderId: 'ORD-1036',
+            sku: 'SKU-1013',
+            skuName: 'Thermal Imaging Sensor 4K Core',
+            zone: 'C1',
+            pickerName: 'Maya Patel',
+            reportedAt: '09:35 AM',
+            issueDescription: 'Bin C1-R02-B09 is physically empty despite ledger recording 5 units on hand.',
+            systemDecision: 'Ledger discrepancy detected. Freeze bin allocation, initiate emergency cycle count.',
+            recommendedResolution: 'Split order shipment: dispatch available line items and create expedited supplier replenishment PO-4091 for 8 units.',
+            status: 'Pending Review',
+            impactLevel: 'Moderate'
+          },
+          {
+            id: 'EX-903',
+            type: 'stock_mismatch',
+            orderId: 'ORD-1031',
+            sku: 'SKU-1005',
+            skuName: 'Heavy-Duty Hydraulic Coupling',
+            zone: 'B2',
+            pickerName: 'Marcus Vance',
+            reportedAt: '09:22 AM',
+            issueDescription: 'Physical count in bin B2-R03-B01 is 2 units less than system inventory due to unreported packaging damage.',
+            systemDecision: 'Reconcile digital inventory balance to reflect 4 physical units on hand.',
+            recommendedResolution: 'Execute inventory write-down of 2 damaged units and trigger automatic purchase order restock.',
+            status: 'Pending Review',
+            impactLevel: 'Moderate'
+          },
+          {
+            id: 'EX-904',
+            type: 'delayed_picking',
+            orderId: 'ORD-1031',
+            sku: 'SKU-1005',
+            skuName: 'Heavy-Duty Hydraulic Coupling',
+            zone: 'B2',
+            pickerName: 'Marcus Vance',
+            reportedAt: '09:45 AM',
+            issueDescription: 'Picking SLA overdue by 29 minutes due to heavy pallet congestion and picker overload in Zone B2.',
+            systemDecision: 'Zone B2 bottleneck confirmed (average task delay: 18 mins). Workload rebalancing required.',
+            recommendedResolution: 'Reassign 2 pending Zone B2 tasks to available idle picker Elena Rostova in adjacent Zone A1.',
+            status: 'Pending Review',
+            impactLevel: 'Critical'
+          }
+        ]
+      };
+
+      // --- Helpers ---
+      function formatCurrency(amount) {
+        return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(amount);
+      }
+
+      function formatSimTime(totalMins) {
+        const h = Math.floor(totalMins / 60) % 24;
+        const m = totalMins % 60;
+        const p = h >= 12 ? 'PM' : 'AM';
+        const dh = h % 12 === 0 ? 12 : h % 12;
+        return `${dh.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')} ${p}`;
+      }
+
+      function formatSlaCountdown(minutesRemaining) {
+        if (minutesRemaining < 0) {
+          const overdueMins = Math.abs(minutesRemaining);
+          const hours = Math.floor(overdueMins / 60);
+          const mins = overdueMins % 60;
+          const text = hours > 0 ? `-${hours}h ${mins}m OVERDUE` : `-${mins}m OVERDUE`;
+          return { text, isOverdue: true };
+        }
+        const hours = Math.floor(minutesRemaining / 60);
+        const mins = minutesRemaining % 60;
+        const text = hours > 0 ? `${hours}h ${mins}m left` : `${mins}m left`;
+        return { text, isOverdue: false };
+      }
+
+      function showToast(title, message, type = 'success') {
+        const id = 't-' + Date.now();
+        state.toasts.unshift({ id, title, message, type });
+        state.toasts = state.toasts.slice(0, 4);
+        renderToasts();
+        setTimeout(() => {
+          state.toasts = state.toasts.filter(t => t.id !== id);
+          renderToasts();
+        }, 5000);
+      }
+
+      function renderToasts() {
+        const root = document.getElementById('toast-root');
+        if (!root) return;
+        root.innerHTML = state.toasts.map(t => `
+          <div class="pointer-events-auto p-4 rounded-2xl bg-slate-900 border border-cyan-500/80 shadow-[0_0_25px_rgba(6,182,212,0.3)] backdrop-blur-xl text-slate-100 flex items-start space-x-3 animate-slide-up">
+            <span class="text-xl">⚡</span>
+            <div class="flex-1">
+              <h4 class="font-bold text-sm text-slate-100">${t.title}</h4>
+              <p class="text-xs text-slate-300 mt-0.5">${t.message}</p>
+            </div>
+            <button onclick="window.flowforge.dismissToast('${t.id}')" class="text-slate-400 hover:text-slate-200 text-xs">✕</button>
+          </div>
+        `).join('');
+      }
+
+      function exportCSV() {
+        const headers = ['Order ID', 'Customer', 'Tier', 'Priority', 'SLA Deadline', 'Items Qty', 'Total Value ($)', 'Status'];
+        const rows = state.orders.map(o => [o.id, `"${o.customerName}"`, o.customerTier, o.priority, o.slaDeadline, o.items.length, o.totalValue, o.fulfillmentStatus].join(','));
+        const csv = [headers.join(','), ...rows].join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `flowforge-orders-${new Date().toISOString().split('T')[0]}.csv`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        showToast('CSV Export Ready', 'Exported orders dataset successfully.', 'info');
+      }
+
+      // --- Action Handlers ---
+      const actions = {
+        setPage(page) {
+          sound.playClick();
+          state.activePage = page;
+          renderApp();
+        },
+        toggleSound() {
+          state.soundEnabled = !state.soundEnabled;
+          sound.enabled = state.soundEnabled;
+          renderApp();
+        },
+        advanceSimTime(mins = 15) {
+          state.simMinutes += mins;
+          sound.playClick();
+          showToast('Simulation Advanced', `+${mins} minutes elapsed. Sim time: ${formatSimTime(state.simMinutes)}`, 'info');
+          renderApp();
+        },
+        spawnUrgentOrder() {
+          const newId = 'ORD-' + (1050 + Math.floor(Math.random() * 50));
+          const newOrder = {
+            id: newId,
+            customerName: 'Raytheon Defense Intelligence',
+            customerTier: 'Enterprise',
+            createdAt: formatSimTime(state.simMinutes),
+            slaDeadline: formatSimTime(state.simMinutes + 45),
+            minutesRemaining: 45,
+            priority: 'Critical',
+            priorityScore: 97,
+            priorityFactors: { tierScore: 40, slaScore: 35, valueScore: 16, urgencyScore: 6 },
+            items: [{ sku: 'SKU-1006', name: 'Fiber Optic Transceiver 100G', quantityRequested: 10, quantityAllocated: 10, unitPrice: 140, zone: 'C1' }],
+            totalValue: 1400,
+            allocationStatus: 'Fully Allocated',
+            fulfillmentStatus: 'Created',
+            zone: 'C1',
+            notes: 'Urgent flight avionics optical unit.',
+            history: [{ timestamp: formatSimTime(state.simMinutes), event: 'Order Ingested via Defense EDI', actor: 'System' }]
+          };
+          state.orders.unshift(newOrder);
+          sound.playSuccess();
+          showToast('Critical Order Ingested', `Enterprise Order ${newId} received (SLA 45m). Added to Priority Queue.`, 'warning');
+          renderApp();
+        },
+        resetData() {
+          state.orders = JSON.parse(JSON.stringify(INITIAL_ORDERS));
+          state.inventory = JSON.parse(JSON.stringify(INITIAL_INVENTORY));
+          state.conflicts = JSON.parse(JSON.stringify(INITIAL_CONFLICTS));
+          state.exceptions = JSON.parse(JSON.stringify(INITIAL_EXCEPTIONS));
+          state.tasks = JSON.parse(JSON.stringify(INITIAL_PICKING_TASKS));
+          state.tourActive = false;
+          showToast('Demo State Reset', 'Restored initial warehouse operational state.', 'info');
+          renderApp();
+        },
+        startTour() {
+          sound.playSuccess();
+          state.activePage = 'allocation';
+          state.tourActive = true;
+          state.tourStep = 0;
+          renderApp();
+        },
+        nextTourStep() {
+          state.tourStep = Math.min(4, state.tourStep + 1);
+          renderApp();
+        },
+        prevTourStep() {
+          state.tourStep = Math.max(0, state.tourStep - 1);
+          renderApp();
+        },
+        exitTour() {
+          state.tourActive = false;
+          renderApp();
+        },
+        approveReallocation(conflictId) {
+          const conf = state.conflicts.find(c => c.id === conflictId);
+          if (!conf) return;
+
+          state.orders = state.orders.map(ord => {
+            if (ord.id === conf.criticalOrderId) {
+              return {
+                ...ord,
+                allocationStatus: 'Fully Allocated',
+                fulfillmentStatus: 'Allocated',
+                notes: `Stock secured: +3 units SKU-1001 reallocated from ${conf.lowerOrderId}.`,
+                items: ord.items.map(it => it.sku === conf.sku ? { ...it, quantityAllocated: it.quantityRequested } : it),
+                history: [...ord.history, { timestamp: formatSimTime(state.simMinutes), event: `Reallocated +3 units SKU-1001 from ${conf.lowerOrderId}`, actor: 'Decision Engine' }]
+              };
+            }
+            if (ord.id === conf.lowerOrderId) {
+              return {
+                ...ord,
+                allocationStatus: 'Partially Allocated',
+                items: ord.items.map(it => it.sku === conf.sku ? { ...it, quantityAllocated: it.quantityAllocated - 3 } : it),
+                history: [...ord.history, { timestamp: formatSimTime(state.simMinutes), event: `Transferred 3 units to priority order ${conf.criticalOrderId}`, actor: 'Decision Engine' }]
+              };
+            }
+            return ord;
+          });
+
+          conf.resolved = true;
+
+          // Add picking task for Elena
+          state.tasks.unshift({
+            id: 'TSK-209',
+            orderId: conf.criticalOrderId,
+            customerName: conf.criticalCustomer,
+            pickerName: 'Elena Rostova',
+            pickerId: 'PCK-02',
+            zone: 'A1',
+            itemCount: 14,
+            dueTime: '11:00 AM',
+            minutesRemaining: 45,
+            status: 'Ready',
+            isBottleneck: false,
+            priority: 'Critical'
+          });
+
+          sound.playSuccess();
+          showToast('Critical Order Allocation Secured', 'Critical order allocation secured. SLA risk removed.', 'success');
+          state.tourActive = false;
+          renderApp();
+        },
+        allocatePartial(conflictId) {
+          const conf = state.conflicts.find(c => c.id === conflictId);
+          if (!conf) return;
+          state.orders = state.orders.map(ord => {
+            if (ord.id === conf.criticalOrderId) {
+              return { ...ord, allocationStatus: 'Partially Allocated', notes: 'Allocated 7 available units from shelf. Backorder queued.' };
+            }
+            return ord;
+          });
+          conf.resolved = true;
+          sound.playSuccess();
+          showToast('Partial Stock Allocated', 'Partial stock allocated to critical order. Remainder queued for restock.', 'warning');
+          renderApp();
+        },
+        openReorder(sku) {
+          const it = state.inventory.find(i => i.sku === sku);
+          if (it) {
+            state.reorderItem = it;
+            state.reorderQty = it.reorderLevel * 2;
+            renderModals();
+          }
+        },
+        confirmReorder(sku, qty) {
+          state.inventory = state.inventory.map(item => {
+            if (item.sku === sku) {
+              const onHand = item.onHand + qty;
+              return {
+                ...item,
+                onHand,
+                available: Math.max(0, onHand - item.reserved),
+                status: 'Healthy'
+              };
+            }
+            return item;
+          });
+          sound.playSuccess();
+          showToast('Purchase Order Authorized', `Restocked +${qty} units of ${sku}. Inventory restored to Healthy.`, 'success');
+          state.reorderItem = null;
+          renderApp();
+        },
+        openReassign(task) {
+          state.reassignTask = task;
+          state.selectedPickerTarget = 'PCK-02';
+          renderModals();
+        },
+        confirmReassign(taskId, targetPickerId) {
+          const targetPicker = state.pickers.find(p => p.id === targetPickerId) || state.pickers[1];
+          state.tasks = state.tasks.map(t => {
+            if (t.id === taskId) {
+              return {
+                ...t,
+                pickerId: targetPicker.id,
+                pickerName: targetPicker.name,
+                status: 'In Progress',
+                isBottleneck: false
+              };
+            }
+            return t;
+          });
+          sound.playSuccess();
+          showToast('Picker Reassigned', `Task reassigned to ${targetPicker.name}. Zone B2 bottleneck cleared!`, 'success');
+          state.reassignTask = null;
+          renderApp();
+        },
+        openException(ex) {
+          state.resolveException = ex;
+          state.resolveOption = 'recommended';
+          renderModals();
+        },
+        confirmResolveException(exId) {
+          const ex = state.exceptions.find(e => e.id === exId);
+          if (ex && ex.id === 'EX-901') {
+            state.orders = state.orders.map(ord => {
+              if (ord.id === ex.orderId) {
+                return {
+                  ...ord,
+                  fulfillmentStatus: 'Picking',
+                  notes: 'Substituted SKU-1008 with Rev B (SKU-1010). Picking resumed.',
+                  items: ord.items.map(it => it.sku === 'SKU-1008' ? { ...it, sku: 'SKU-1010', name: 'Brushless DC Motor 48V (Rev B)' } : it),
+                  history: [...ord.history, { timestamp: formatSimTime(state.simMinutes), event: 'Exception EX-901 resolved: Substituted SKU-1008 with SKU-1010', actor: 'Decision Engine' }]
+                };
+              }
+              return ord;
+            });
+          }
+          if (ex) ex.status = 'Resolved';
+          sound.playSuccess();
+          showToast('Exception Resolved', `Incident ${exId} cleared. Order fulfillment resumed.`, 'success');
+          state.resolveException = null;
+          renderApp();
+        },
+        advanceOrder(orderId) {
+          const stages = ['Created', 'Allocated', 'Picking', 'Packed', 'Quality Check', 'Dispatched'];
+          state.orders = state.orders.map(ord => {
+            if (ord.id === orderId) {
+              const curIdx = stages.indexOf(ord.fulfillmentStatus);
+              const next = curIdx < stages.length - 1 ? stages[curIdx + 1] : ord.fulfillmentStatus;
+              return {
+                ...ord,
+                fulfillmentStatus: next,
+                history: [...ord.history, { timestamp: formatSimTime(state.simMinutes), event: `Stage advanced to ${next}`, actor: 'Operations Manager' }]
+              };
+            }
+            return ord;
+          });
+          if (state.selectedOrder && state.selectedOrder.id === orderId) {
+            state.selectedOrder = state.orders.find(o => o.id === orderId);
+          }
+          showToast('Order Advanced', `Order ${orderId} moved to next workflow stage.`, 'info');
+          renderApp();
+        },
+        advanceTask(taskId) {
+          const stages = ['Ready', 'In Progress', 'Packed', 'Quality Check'];
+          state.tasks = state.tasks.map(t => {
+            if (t.id === taskId) {
+              const curIdx = stages.indexOf(t.status);
+              const next = curIdx >= 0 && curIdx < stages.length - 1 ? stages[curIdx + 1] : t.status;
+              return { ...t, status: next, isBottleneck: false };
+            }
+            return t;
+          });
+          showToast('Task Board Updated', 'Task moved to next stage.', 'info');
+          renderApp();
+        },
+        openOrder(order) {
+          state.selectedOrder = order;
+          renderModals();
+        },
+        closeModal() {
+          state.selectedOrder = null;
+          state.reorderItem = null;
+          state.reassignTask = null;
+          state.resolveException = null;
+          renderModals();
+        },
+        dismissToast(id) {
+          state.toasts = state.toasts.filter(t => t.id !== id);
+          renderToasts();
+        }
+      };
+
+      window.flowforge = actions;
+      window.exportCSV = exportCSV;
+
+      // --- RENDER APP VIEW ---
+      function renderApp() {
+        const app = document.getElementById('app');
+        if (!app) return;
+
+        const TOUR_STEPS = [
+          { title: 'Step 1: Critical Order Ingestion (ORD-1042)', desc: 'Enterprise client Apex Robotics has placed critical order ORD-1042 (SLA 46m). Requires 10 units of SKU-1001.' },
+          { title: 'Step 2: Inventory Deficit Detected', desc: 'Physical shelf availability is only 7 units unallocated. Deficit of 3 units creates an immediate SLA breach risk.' },
+          { title: 'Step 3: Identification of Lower-Priority Reservation', desc: 'Decision Engine identifies lower-priority ORD-1037 (Standard Tier, SLA in 4h 30m) currently holding 5 reserved units of SKU-1001.' },
+          { title: 'Step 4: AI Reallocation Recommendation', desc: '“Reallocate 3 units from ORD-1037 to ORD-1042. This protects the critical SLA. Notify the affected low-priority order.”' },
+          { title: 'Step 5: Operational Authorization', desc: 'Click "Approve Reallocation" to transfer reservation, reconcile stock, and advance ORD-1042 to picking stage.' }
+        ];
+
+        // Filtered data
+        const filteredOrders = state.orders.filter(o => {
+          const matchSearch = o.id.toLowerCase().includes(state.orderSearch.toLowerCase()) || o.customerName.toLowerCase().includes(state.orderSearch.toLowerCase());
+          const matchPri = state.orderPriorityFilter === 'ALL' || o.priority === state.orderPriorityFilter;
+          return matchSearch && matchPri;
+        });
+
+        const filteredInventory = state.inventory.filter(i => {
+          const matchSearch = i.sku.toLowerCase().includes(state.invSearch.toLowerCase()) || i.name.toLowerCase().includes(state.invSearch.toLowerCase());
+          const matchZone = state.invZoneFilter === 'ALL' || i.zone === state.invZoneFilter;
+          return matchSearch && matchZone;
+        });
+
+        const filteredTasks = state.tasks.filter(t => state.pickingZoneFilter === 'ALL' || t.zone === state.pickingZoneFilter);
+
+        // Sidebar Nav items
+        const navItems = [
+          { id: 'dashboard', label: 'Dashboard', icon: '📊', badge: null },
+          { id: 'orders', label: 'Orders Control', icon: '📦', badge: state.orders.length },
+          { id: 'inventory', label: 'Inventory & SKUs', icon: '🏭', badge: state.inventory.filter(i => i.status !== 'Healthy').length + ' Low' },
+          { id: 'allocation', label: 'Allocation Center', icon: '⚡', badge: state.conflicts.filter(c => !c.resolved).length > 0 ? (state.conflicts.filter(c => !c.resolved).length + ' Conflict') : null },
+          { id: 'picking', label: 'Picking & Packing', icon: '📋', badge: state.tasks.filter(t => t.status === 'Delayed').length > 0 ? (state.tasks.filter(t => t.status === 'Delayed').length + ' Delayed') : null },
+          { id: 'exceptions', label: 'Exceptions Center', icon: '⚠️', badge: state.exceptions.filter(e => e.status !== 'Resolved').length > 0 ? (state.exceptions.filter(e => e.status !== 'Resolved').length + ' Active') : null },
+          { id: 'analytics', label: 'Analytics & SLA', icon: '📈', badge: null },
+        ];
+
+        // Compose HTML
+        app.innerHTML = `
+          <!-- Left Sidebar -->
+          <aside class="w-64 bg-slate-950 border-r border-slate-800 flex flex-col justify-between shrink-0 h-screen sticky top-0 select-none z-30">
+            <div>
+              <div class="p-5 border-b border-slate-800">
+                <div class="flex items-center space-x-3">
+                  <div class="h-10 w-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-cyan-500/20">
+                    ⚡
+                  </div>
+                  <div>
+                    <div class="flex items-center space-x-1.5">
+                      <span class="font-extrabold text-base tracking-tight text-slate-100 font-mono">FlowForge</span>
+                      <span class="px-1.5 py-0.2 rounded bg-cyan-500/20 border border-cyan-500/40 text-cyan-400 font-mono text-[10px] font-bold">AI</span>
+                    </div>
+                    <p class="text-[11px] text-slate-400 font-medium">Smart Warehouse Ops</p>
+                  </div>
+                </div>
+
+                <div class="mt-4 px-3 py-1.5 rounded-lg bg-slate-900/80 border border-slate-800 flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <span class="h-2 w-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    <span class="text-[11px] font-mono text-slate-300">Decision Engine</span>
+                  </div>
+                  <span class="text-[10px] font-mono text-emerald-400 font-bold">ACTIVE</span>
+                </div>
+              </div>
+
+              <nav class="p-3 space-y-1">
+                ${navItems.map(item => `
+                  <button
+                    onclick="window.flowforge.setPage('${item.id}')"
+                    class="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+                      state.activePage === item.id
+                        ? 'bg-gradient-to-r from-cyan-950/70 to-blue-950/40 text-cyan-300 border border-cyan-500/50 shadow-[0_0_15px_rgba(6,182,212,0.15)]'
+                        : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900 border border-transparent'
+                    }"
+                  >
+                    <div class="flex items-center space-x-3">
+                      <span class="text-base">${item.icon}</span>
+                      <span>${item.label}</span>
+                    </div>
+                    ${item.badge ? `
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-rose-950 text-rose-300 border border-rose-800">
+                        ${item.badge}
+                      </span>
+                    ` : ''}
+                  </button>
+                `).join('')}
+              </nav>
+            </div>
+
+            <!-- Sidebar Footer -->
+            <div class="p-4 border-t border-slate-800 space-y-2.5 bg-slate-950/80">
+              <button
+                onclick="window.flowforge.startTour()"
+                class="w-full py-2 px-3 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-600 hover:from-cyan-400 hover:to-indigo-500 text-slate-950 shadow-lg shadow-cyan-500/25 transition flex items-center justify-center space-x-2 font-mono"
+              >
+                <span>🎯 Launch Guided Demo</span>
+              </button>
+
+              <div class="flex items-center justify-between pt-1 text-slate-400 text-xs">
+                <button
+                  onclick="window.flowforge.toggleSound()"
+                  class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-[11px]"
+                >
+                  ${state.soundEnabled ? '🔊 Audio ON' : '🔇 Muted'}
+                </button>
+                <button
+                  onclick="window.flowforge.resetData()"
+                  class="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-[11px] hover:text-rose-300"
+                >
+                  🔄 Reset Data
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <!-- Main Area -->
+          <div class="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+            <!-- Header -->
+            <header class="h-20 bg-slate-950/80 border-b border-slate-800 px-6 flex items-center justify-between backdrop-blur-md sticky top-0 z-20">
+              <div>
+                <div class="flex items-center space-x-2 text-xs font-mono text-cyan-400 mb-0.5">
+                  <span>WAREHOUSE_CONTROL_TOWER</span>
+                  <span>/</span>
+                  <span class="uppercase text-slate-400">${state.activePage}</span>
+                </div>
+                <h1 class="text-lg font-bold text-slate-100">
+                  ${state.activePage === 'dashboard' ? 'Executive Operations Dashboard' : ''}
+                  ${state.activePage === 'orders' ? 'Order Fulfillment & SLA Queue' : ''}
+                  ${state.activePage === 'inventory' ? 'Warehouse Inventory & Stock Ledger' : ''}
+                  ${state.activePage === 'allocation' ? 'Stock Allocation & Conflict Resolver' : ''}
+                  ${state.activePage === 'picking' ? 'Picking, Packing & QC Task Board' : ''}
+                  ${state.activePage === 'exceptions' ? 'Operational Incident & Exceptions Center' : ''}
+                  ${state.activePage === 'analytics' ? 'Fulfillment Analytics & Zone Performance' : ''}
+                </h1>
+              </div>
+
+              <div class="flex items-center space-x-3">
+                <div class="hidden lg:flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 font-mono text-xs">
+                  <span class="text-slate-400">SIM TIME:</span>
+                  <span class="font-bold text-cyan-300">${formatSimTime(state.simMinutes)}</span>
+                  <button
+                    onclick="window.flowforge.advanceSimTime(15)"
+                    class="px-2 py-0.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300"
+                  >
+                    +15m
+                  </button>
+                </div>
+
+                <button
+                  onclick="window.flowforge.spawnUrgentOrder()"
+                  class="hidden sm:flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-rose-950/70 hover:bg-rose-900/80 text-rose-300 border border-rose-800/80 transition"
+                  title="Simulate sudden urgent Enterprise order"
+                >
+                  <span>🚨 +Simulate Influx</span>
+                </button>
+
+                <button
+                  onclick="window.exportCSV()"
+                  class="hidden md:flex items-center space-x-1.5 px-3 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 transition"
+                >
+                  <span>📥 Export CSV</span>
+                </button>
+
+                <button
+                  onclick="window.flowforge.startTour()"
+                  class="px-4 py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/25 transition flex items-center space-x-1.5 animate-pulse"
+                >
+                  <span>🎯 Guided Demo</span>
+                </button>
+              </div>
+            </header>
+
+            <!-- Page Content -->
+            <main class="p-6 flex-1 overflow-y-auto space-y-6">
+              ${state.activePage === 'dashboard' ? renderDashboard() : ''}
+              ${state.activePage === 'orders' ? renderOrders(filteredOrders) : ''}
+              ${state.activePage === 'inventory' ? renderInventory(filteredInventory) : ''}
+              ${state.activePage === 'allocation' ? renderAllocation() : ''}
+              ${state.activePage === 'picking' ? renderPicking(filteredTasks) : ''}
+              ${state.activePage === 'exceptions' ? renderExceptions() : ''}
+              ${state.activePage === 'analytics' ? renderAnalytics() : ''}
+            </main>
+          </div>
+
+          <!-- Guided Tour Spotlight Modal -->
+          ${state.tourActive ? `
+            <div class="fixed bottom-6 right-6 z-50 max-w-lg w-full p-1 animate-slide-up">
+              <div class="bg-slate-900/95 border-2 border-cyan-500/80 rounded-2xl shadow-[0_0_35px_rgba(6,182,212,0.4)] backdrop-blur-xl p-5 text-slate-100 relative overflow-hidden">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <span class="font-mono text-xs text-cyan-400 font-bold">GUIDED DEMO • STEP ${state.tourStep + 1}/5</span>
+                  <button onclick="window.flowforge.exitTour()" class="text-slate-400 text-xs hover:text-slate-200">Exit ✕</button>
+                </div>
+                <div class="py-3 space-y-1">
+                  <h4 class="font-bold text-sm text-slate-100">${TOUR_STEPS[state.tourStep].title}</h4>
+                  <p class="text-xs text-slate-300 leading-relaxed">${TOUR_STEPS[state.tourStep].desc}</p>
+                </div>
+                <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+                  <button
+                    onclick="window.flowforge.prevTourStep()"
+                    ${state.tourStep === 0 ? 'disabled' : ''}
+                    class="px-3 py-1 text-xs rounded bg-slate-800 disabled:opacity-40"
+                  >
+                    ← Prev
+                  </button>
+                  ${state.tourStep === 4 ? `
+                    <button
+                      onclick="window.flowforge.approveReallocation('CONF-01')"
+                      class="px-4 py-1.5 rounded text-xs font-bold bg-cyan-500 text-slate-950 animate-pulse font-mono"
+                    >
+                      ⚡ 1-Click Approve Reallocation
+                    </button>
+                  ` : `
+                    <button
+                      onclick="window.flowforge.nextTourStep()"
+                      class="px-4 py-1 text-xs rounded font-bold bg-cyan-500 text-slate-950"
+                    >
+                      Next Step →
+                    </button>
+                  `}
+                </div>
+              </div>
+            </div>
+          ` : ''}
+        `;
+
+        renderModals();
+      }
+
+      // --- PAGE TEMPLATES ---
+      function renderDashboard() {
+        return `
+          <div class="space-y-6">
+            <!-- Top Banner -->
+            <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-cyan-950/30 to-blue-950/40 border border-cyan-500/30 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div class="flex items-center space-x-4">
+                <div class="h-12 w-12 rounded-2xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-300 text-2xl shrink-0">
+                  🤖
+                </div>
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <h2 class="text-base font-bold text-slate-100">FlowForge Autonomous Control Tower</h2>
+                    <span class="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-cyan-950 text-cyan-300 border border-cyan-800">Rule Engine v2.4</span>
+                  </div>
+                  <p class="text-xs text-slate-300 mt-1">Autonomous decision engine arbitrating priority allocation, picking bottlenecks, and line-item exceptions in real-time.</p>
+                </div>
+              </div>
+              <button
+                onclick="window.flowforge.startTour()"
+                class="px-4 py-2.5 rounded-xl text-xs font-bold bg-cyan-500 hover:bg-cyan-400 text-slate-950 shadow-lg shadow-cyan-500/20 transition font-mono whitespace-nowrap"
+              >
+                🎯 Start Guided Demo (ORD-1042)
+              </button>
+            </div>
+
+            <!-- KPI Cards -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div onclick="window.flowforge.setPage('orders')" class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer">
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>Total Active Orders</span>
+                  <span>📦</span>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                  <span class="text-3xl font-extrabold text-slate-100 font-mono">${state.orders.length}</span>
+                  <span class="text-xs text-emerald-400 font-mono font-semibold">(${state.orders.filter(o => o.fulfillmentStatus === 'Dispatched').length} Dispatched)</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <span>In-flight: <strong class="text-cyan-400 font-mono">${state.orders.filter(o => o.fulfillmentStatus !== 'Dispatched').length} orders</strong></span>
+                </div>
+              </div>
+
+              <div onclick="window.flowforge.setPage('analytics')" class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer">
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>SLA Fulfillment Rate</span>
+                  <span>⚡</span>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                  <span class="text-3xl font-extrabold text-emerald-400 font-mono">96%</span>
+                  <span class="text-xs text-slate-400 font-mono">Target: 95%</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <span>Critical compliance: <strong class="text-emerald-400 font-mono">98.2%</strong></span>
+                </div>
+              </div>
+
+              <div onclick="window.flowforge.setPage('inventory')" class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-amber-700/60 transition cursor-pointer">
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>Low-Stock SKUs</span>
+                  <span>⚠️</span>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                  <span class="text-3xl font-extrabold text-amber-400 font-mono">${state.inventory.filter(i => i.status !== 'Healthy').length}</span>
+                  <span class="text-xs text-amber-400 font-mono">Action Required</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <span>Restock POs queued</span>
+                </div>
+              </div>
+
+              <div onclick="window.flowforge.setPage('picking')" class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-rose-700/60 transition cursor-pointer">
+                <div class="flex items-center justify-between text-xs text-slate-400">
+                  <span>Picking Bottleneck</span>
+                  <span>🛑</span>
+                </div>
+                <div class="mt-3 flex items-baseline space-x-2">
+                  <span class="text-2xl font-extrabold text-rose-400 font-mono">Zone B2</span>
+                  <span class="text-xs text-rose-400 font-mono">(${state.tasks.filter(t => t.zone === 'B2' && t.status === 'Delayed').length} Delayed)</span>
+                </div>
+                <div class="mt-2 text-xs text-slate-400 pt-2 border-t border-slate-800">
+                  <span>Avg delay: <strong class="text-rose-400 font-mono">18 min</strong></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Fulfillment Pipeline Visualizer -->
+            <div class="p-6 rounded-2xl bg-slate-900/90 border border-slate-800">
+              <div class="flex justify-between items-center mb-4">
+                <div>
+                  <h3 class="text-sm font-bold text-slate-100 font-mono uppercase">Live Fulfillment Pipeline</h3>
+                  <p class="text-xs text-slate-400">Order workflow progression through warehouse stages</p>
+                </div>
+                <span class="text-xs font-mono text-cyan-400 bg-cyan-950 px-3 py-1 rounded-full border border-cyan-800">
+                  Total Throughput: ${state.orders.length} Orders
+                </span>
+              </div>
+
+              <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                ${[
+                  { stage: 'Created', label: '1. Created', icon: '📝', color: 'text-slate-300' },
+                  { stage: 'Allocated', label: '2. Allocated', icon: '⚡', color: 'text-blue-400' },
+                  { stage: 'Picking', label: '3. Picking', icon: '🛒', color: 'text-amber-400' },
+                  { stage: 'Packed', label: '4. Packed', icon: '📦', color: 'text-indigo-400' },
+                  { stage: 'Quality Check', label: '5. QC Verify', icon: '🔍', color: 'text-purple-400' },
+                  { stage: 'Dispatched', label: '6. Dispatched', icon: '🚀', color: 'text-emerald-400' },
+                ].map(ps => {
+                  const count = state.orders.filter(o => o.fulfillmentStatus === ps.stage).length;
+                  return `
+                    <div class="p-3.5 rounded-xl border border-slate-800 bg-slate-950/60 flex flex-col justify-between">
+                      <div class="flex items-center justify-between text-xs mb-1">
+                        <span>${ps.icon}</span>
+                        <span class="font-bold ${ps.color}">${ps.label}</span>
+                      </div>
+                      <div class="mt-2 text-2xl font-mono font-bold text-slate-100">${count}</div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <!-- Two Column: Decision Center vs Low Stock/Alerts -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              <!-- Decision Center -->
+              <div class="lg:col-span-2 space-y-4">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center space-x-2">
+                    <span class="h-3 w-3 rounded-full bg-cyan-400 animate-pulse"></span>
+                    <h3 class="text-base font-bold text-slate-100 font-mono">AI Operational Decision Center</h3>
+                  </div>
+                  <span class="text-xs text-slate-400">Rule-Based Recommendations</span>
+                </div>
+
+                <div class="space-y-3">
+                  <!-- Decision 1: Allocation -->
+                  <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-cyan-950/30 border border-slate-800 hover:border-cyan-500/50 transition">
+                    <div class="flex justify-between items-center mb-1">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">Immediate Action</span>
+                      <span class="text-xs font-mono text-cyan-400 font-bold">[Stock Allocation]</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-100 mt-1">Priority Stock Reallocation: ORD-1042 (Apex Robotics)</h4>
+                    <p class="text-xs text-slate-300 mt-1">ORD-1042 needs 10 units of SKU-1001 (only 7 available). Reallocate 3 reserved units from low-priority ORD-1037 (Standard) to secure critical $14,500 Enterprise delivery.</p>
+                    <div class="mt-3 flex justify-between items-center border-t border-slate-800/80 pt-2">
+                      <span class="text-xs text-emerald-400">Projected: Protects 45-min SLA deadline</span>
+                      <button
+                        onclick="window.flowforge.approveReallocation('CONF-01')"
+                        class="px-4 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950"
+                      >
+                        ⚡ Approve Reallocation
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Decision 2: Zone B2 -->
+                  <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-900 to-amber-950/30 border border-slate-800 hover:border-amber-500/50 transition">
+                    <div class="flex justify-between items-center mb-1">
+                      <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-950 text-amber-300 border border-amber-800">Workload Balance</span>
+                      <span class="text-xs font-mono text-amber-400 font-bold">[Zone B2 Bottleneck]</span>
+                    </div>
+                    <h4 class="text-sm font-bold text-slate-100 mt-1">Zone B2 Throughput Bottleneck (18m Avg Delay)</h4>
+                    <p class="text-xs text-slate-300 mt-1">Zone B2 pickers (Marcus Vance & Kenji Takahashi) are overloaded. Reassign pending task TSK-201 to idle picker Elena Rostova (Zone A1, 99% efficiency).</p>
+                    <div class="mt-3 flex justify-between items-center border-t border-slate-800/80 pt-2">
+                      <span class="text-xs text-emerald-400">Projected: Clears 18-minute backlog</span>
+                      <button
+                        onclick="window.flowforge.confirmReassign('TSK-201', 'PCK-02')"
+                        class="px-4 py-1.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-orange-600 text-slate-950"
+                      >
+                        ⚡ Reassign to Elena Rostova
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Low Stock & Alerts -->
+              <div class="space-y-4">
+                <!-- Low Stock SKUs -->
+                <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                  <div class="flex justify-between items-center">
+                    <span class="text-amber-400 font-bold text-xs flex items-center space-x-1">
+                      <span>⚠️</span>
+                      <span>Low-Stock SKUs</span>
+                    </span>
+                    <button onclick="window.flowforge.setPage('inventory')" class="text-xs text-cyan-400 hover:underline">View All →</button>
+                  </div>
+                  <div class="space-y-2 max-h-56 overflow-y-auto custom-scrollbar pr-1">
+                    ${state.inventory.filter(i => i.status !== 'Healthy').slice(0, 4).map(item => `
+                      <div class="p-2.5 rounded-xl bg-slate-950/60 border border-slate-800 flex justify-between items-center text-xs">
+                        <div>
+                          <span class="font-mono text-cyan-400 font-bold">${item.sku}</span>
+                          <div class="text-slate-300 truncate max-w-[130px]">${item.name}</div>
+                        </div>
+                        <button
+                          onclick="window.flowforge.openReorder('${item.sku}')"
+                          class="px-2 py-1 rounded-lg text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        >
+                          + Reorder
+                        </button>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <!-- Operational Alerts -->
+                <div class="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 space-y-3">
+                  <span class="text-rose-400 font-bold text-xs flex items-center space-x-1">
+                    <span>🚨</span>
+                    <span>Live System Alerts</span>
+                  </span>
+                  <div class="space-y-2 text-xs">
+                    <div class="p-2.5 rounded-xl bg-rose-950/30 border border-rose-800/40">
+                      <div class="font-bold text-rose-300">Critical Deficit (ORD-1042)</div>
+                      <p class="text-[11px] text-slate-300">SKU-1001 deficit of 3 units flagged for line-down order.</p>
+                    </div>
+                    <div class="p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40">
+                      <div class="font-bold text-amber-300">Zone B2 Congestion</div>
+                      <p class="text-[11px] text-slate-300">2 picking tasks overdue. Picker Marcus loaded at 125%.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderOrders(ordersList) {
+        return `
+          <div class="space-y-4">
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col md:flex-row justify-between gap-4 items-center">
+              <input
+                type="text"
+                placeholder="Search by Order ID (ORD-1042) or Customer..."
+                value="${state.orderSearch}"
+                oninput="state.orderSearch = this.value; renderApp();"
+                class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 w-full max-w-md focus:outline-none focus:border-cyan-500"
+              />
+              <div class="flex items-center space-x-1.5 overflow-x-auto">
+                ${['ALL', 'Critical', 'High', 'Normal', 'Low'].map(p => `
+                  <button
+                    onclick="state.orderPriorityFilter = '${p}'; renderApp();"
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap ${state.orderPriorityFilter === p ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400 border border-slate-800'}"
+                  >
+                    ${p}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="border border-slate-800 rounded-2xl bg-slate-900/90 overflow-hidden shadow-xl">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-950 text-slate-400 uppercase text-[11px] font-mono border-b border-slate-800">
+                    <tr>
+                      <th class="py-3 px-4">Order ID</th>
+                      <th class="py-3 px-4">Customer & Tier</th>
+                      <th class="py-3 px-4">Priority</th>
+                      <th class="py-3 px-4">SLA Deadline</th>
+                      <th class="py-3 px-4">Items</th>
+                      <th class="py-3 px-4">Allocation</th>
+                      <th class="py-3 px-4">Fulfillment</th>
+                      <th class="py-3 px-4 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/70">
+                    ${ordersList.map(o => {
+                      const slaInfo = formatSlaCountdown(o.minutesRemaining);
+                      return `
+                        <tr class="hover:bg-slate-800/30 transition cursor-pointer" onclick="window.flowforge.openOrder(state.orders.find(x => x.id === '${o.id}'))">
+                          <td class="py-3.5 px-4 font-mono font-bold text-slate-100">${o.id}</td>
+                          <td class="py-3.5 px-4">
+                            <div class="font-semibold text-slate-200">${o.customerName}</div>
+                            <span class="inline-block px-1.5 py-0.2 rounded text-[10px] bg-purple-950/60 text-purple-300 border border-purple-800/70">${o.customerTier}</span>
+                          </td>
+                          <td class="py-3.5 px-4">
+                            <span class="px-2 py-0.5 rounded-full text-[11px] font-bold border ${o.priority === 'Critical' ? 'bg-rose-950/70 text-rose-400 border-rose-800' : (o.priority === 'High' ? 'bg-amber-950/70 text-amber-400 border-amber-800' : 'bg-slate-800 text-slate-300 border-slate-700')}">${o.priority}</span>
+                          </td>
+                          <td class="py-3.5 px-4 font-mono">
+                            <div>${o.slaDeadline}</div>
+                            <span class="text-[10px] ${slaInfo.isOverdue ? 'text-rose-400' : 'text-emerald-400'}">${slaInfo.text}</span>
+                          </td>
+                          <td class="py-3.5 px-4 font-mono">
+                            ${o.items.length} SKUs • <span class="text-cyan-400 font-bold">${formatCurrency(o.totalValue)}</span>
+                          </td>
+                          <td class="py-3.5 px-4">
+                            <span class="px-2 py-0.5 rounded text-[10px] border ${o.allocationStatus === 'Fully Allocated' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-rose-950 text-rose-300 border-rose-800'}">${o.allocationStatus}</span>
+                          </td>
+                          <td class="py-3.5 px-4">
+                            <span class="px-2 py-0.5 rounded text-[11px] font-semibold border ${o.fulfillmentStatus === 'Dispatched' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-blue-950 text-blue-300 border-blue-800'}">${o.fulfillmentStatus}</span>
+                          </td>
+                          <td class="py-3.5 px-4 text-right space-x-2" onclick="event.stopPropagation()">
+                            <button onclick="window.flowforge.openOrder(state.orders.find(x => x.id === '${o.id}'))" class="px-2.5 py-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300">Details</button>
+                            ${o.fulfillmentStatus !== 'Dispatched' ? `
+                              <button onclick="window.flowforge.advanceOrder('${o.id}')" class="px-2.5 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 border border-cyan-500/40">Advance ⚡</button>
+                            ` : ''}
+                          </td>
+                        </tr>
+                      `;
+                    }).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderInventory(invList) {
+        return `
+          <div class="space-y-4">
+            <div class="p-4 rounded-2xl bg-slate-900/90 border border-slate-800 flex flex-col md:flex-row justify-between gap-4 items-center">
+              <input
+                type="text"
+                placeholder="Search SKU (SKU-1001) or Product Name..."
+                value="${state.invSearch}"
+                oninput="state.invSearch = this.value; renderApp();"
+                class="bg-slate-950 border border-slate-800 rounded-xl px-4 py-2 text-xs text-slate-100 w-full max-w-md focus:outline-none focus:border-cyan-500"
+              />
+              <div class="flex items-center space-x-1.5 overflow-x-auto">
+                ${['ALL', 'A1', 'A2', 'B1', 'B2', 'C1'].map(z => `
+                  <button
+                    onclick="state.invZoneFilter = '${z}'; renderApp();"
+                    class="px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap ${state.invZoneFilter === z ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400 border border-slate-800'}"
+                  >
+                    ${z === 'ALL' ? 'All Zones' : `Zone ${z}`}
+                  </button>
+                `).join('')}
+              </div>
+            </div>
+
+            <div class="border border-slate-800 rounded-2xl bg-slate-900/90 overflow-hidden shadow-xl">
+              <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                  <thead class="bg-slate-950 text-slate-400 uppercase text-[11px] font-mono border-b border-slate-800">
+                    <tr>
+                      <th class="py-3 px-4">SKU & Item Name</th>
+                      <th class="py-3 px-4">Category</th>
+                      <th class="py-3 px-4 text-center">Zone & Bin</th>
+                      <th class="py-3 px-4 text-center">On Hand</th>
+                      <th class="py-3 px-4 text-center">Reserved</th>
+                      <th class="py-3 px-4 text-center">Available</th>
+                      <th class="py-3 px-4 text-center">Reorder Point</th>
+                      <th class="py-3 px-4 text-center">Status</th>
+                      <th class="py-3 px-4 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800/70 font-mono">
+                    ${invList.map(item => `
+                      <tr class="hover:bg-slate-800/30 transition">
+                        <td class="py-3.5 px-4 font-sans">
+                          <div class="font-mono font-bold text-slate-100 text-xs">${item.sku}</div>
+                          <div class="text-slate-300 text-xs">${item.name}</div>
+                        </td>
+                        <td class="py-3.5 px-4 font-sans text-slate-400">${item.category}</td>
+                        <td class="py-3.5 px-4 text-center">
+                          <span class="px-2 py-0.5 rounded bg-slate-800 text-cyan-300 font-bold">${item.zone}</span>
+                          <div class="text-[10px] text-slate-500">${item.binLocation}</div>
+                        </td>
+                        <td class="py-3.5 px-4 text-center text-slate-100 font-bold">${item.onHand}</td>
+                        <td class="py-3.5 px-4 text-center text-amber-400 font-semibold">${item.reserved}</td>
+                        <td class="py-3.5 px-4 text-center font-bold text-emerald-400">${item.available}</td>
+                        <td class="py-3.5 px-4 text-center text-slate-400">${item.reorderLevel}</td>
+                        <td class="py-3.5 px-4 text-center font-sans">
+                          <span class="px-2 py-0.5 rounded-full text-[11px] font-bold border ${item.status === 'Healthy' ? 'bg-emerald-950 text-emerald-300 border-emerald-800' : 'bg-amber-950 text-amber-300 border-amber-800'}">${item.status}</span>
+                        </td>
+                        <td class="py-3.5 px-4 text-right font-sans">
+                          <button
+                            onclick="window.flowforge.openReorder('${item.sku}')"
+                            class="px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40"
+                          >
+                            + Reorder
+                          </button>
+                        </td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      function renderAllocation() {
+        const activeConflicts = state.conflicts.filter(c => !c.resolved);
+        return `
+          <div class="space-y-6">
+            ${activeConflicts.map(conf => `
+              <div class="p-6 rounded-2xl bg-slate-900 border border-cyan-500/60 shadow-xl space-y-4">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                  <span class="font-mono text-rose-400 font-bold text-sm">CONFLICT: ${conf.criticalOrderId} vs ${conf.lowerOrderId}</span>
+                  <span class="text-xs font-mono text-cyan-300 font-bold">SKU: ${conf.sku} (${conf.skuName})</span>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                  <div class="p-4 rounded-xl bg-slate-950 border border-rose-900/60 space-y-2">
+                    <span class="font-bold text-rose-300">Critical Recipient: ${conf.criticalOrderId} (${conf.criticalCustomer})</span>
+                    <p class="text-slate-300">Needs 10 units of SKU-1001. Only 7 unallocated units on shelf. Deficit: 3 units.</p>
+                  </div>
+
+                  <div class="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-2">
+                    <span class="font-bold text-slate-300">Lower Priority Order: ${conf.lowerOrderId} (${conf.lowerCustomer})</span>
+                    <p class="text-slate-300">Holding 5 reserved units. SLA is 4h 30m away (Standard tier).</p>
+                  </div>
+                </div>
+
+                <div class="p-3.5 rounded-xl bg-cyan-950/30 border border-cyan-500/40 text-xs text-slate-200 font-mono">
+                  ${conf.explanation}
+                </div>
+
+                <div class="flex flex-wrap justify-end gap-3 pt-2">
+                  <button
+                    onclick="window.flowforge.openReorder('${conf.sku}')"
+                    class="px-3 py-2 rounded-xl text-xs bg-slate-800 text-slate-300 hover:bg-slate-700"
+                  >
+                    📦 Create Reorder Request
+                  </button>
+                  <button
+                    onclick="window.flowforge.allocatePartial('${conf.id}')"
+                    class="px-3.5 py-2 rounded-xl text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                  >
+                    ⚡ Allocate Partial Stock (7 units)
+                  </button>
+                  <button
+                    onclick="window.flowforge.approveReallocation('${conf.id}')"
+                    class="px-5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 text-slate-950 shadow-lg shadow-cyan-500/25 animate-pulse"
+                  >
+                    ✅ Approve Reallocation (+3 units)
+                  </button>
+                </div>
+              </div>
+            `).join('')}
+
+            ${activeConflicts.length === 0 ? `
+              <div class="p-12 text-center rounded-2xl bg-slate-900/60 border border-slate-800 space-y-2">
+                <div class="text-3xl">🎉</div>
+                <h3 class="text-base font-bold text-slate-100 font-mono">All Allocation Conflicts Resolved</h3>
+                <p class="text-xs text-slate-400">Critical SLAs are secured and orders are moving to picking.</p>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }
+
+      function renderPicking(tasksList) {
+        const delayedZoneB2 = state.tasks.filter(t => t.zone === 'B2' && t.status === 'Delayed').length;
+        return `
+          <div class="space-y-6">
+            ${delayedZoneB2 > 0 ? `
+              <div class="p-4 rounded-2xl bg-rose-950/40 border border-rose-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                  <h3 class="text-sm font-bold text-rose-200 font-mono">Zone B2 Bottleneck Detected (18-min average delay)</h3>
+                  <p class="text-xs text-slate-300">Marcus Vance & Kenji Takahashi are overloaded. Reassign tasks to Elena Rostova.</p>
+                </div>
+                <button
+                  onclick="window.flowforge.confirmReassign('TSK-201', 'PCK-02')"
+                  class="px-4 py-2 rounded-xl text-xs font-bold bg-rose-500 text-slate-950 font-mono shrink-0"
+                >
+                  🔄 Reassign Zone B2
+                </button>
+              </div>
+            ` : ''}
+
+            <div class="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex items-center space-x-2">
+              <span class="text-xs text-slate-400 font-mono">Filter Zone:</span>
+              ${['ALL', 'A1', 'A2', 'B1', 'B2', 'C1'].map(z => `
+                <button
+                  onclick="state.pickingZoneFilter = '${z}'; renderApp();"
+                  class="px-3 py-1 rounded-xl text-xs font-semibold ${state.pickingZoneFilter === z ? 'bg-cyan-500 text-slate-950 font-bold' : 'bg-slate-950 text-slate-400 border border-slate-800'}"
+                >
+                  ${z === 'ALL' ? 'All' : `Zone ${z}`}
+                </button>
+              `).join('')}
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+              ${['Ready', 'In Progress', 'Delayed', 'Packed', 'Quality Check'].map(st => {
+                const colTasks = tasksList.filter(t => t.status === st);
+                return `
+                  <div class="p-3.5 rounded-2xl bg-slate-900 border border-slate-800 h-[600px] flex flex-col space-y-3">
+                    <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                      <span class="font-bold text-xs text-slate-200">${st}</span>
+                      <span class="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400">${colTasks.length}</span>
+                    </div>
+                    <div class="space-y-2 overflow-y-auto custom-scrollbar flex-1">
+                      ${colTasks.map(t => `
+                        <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5 text-xs">
+                          <div class="flex justify-between font-mono text-cyan-400 font-bold">${t.orderId}</div>
+                          <div class="text-slate-300 font-medium">${t.customerName}</div>
+                          <div class="text-slate-400 text-[11px]">Picker: <strong class="text-slate-200">${t.pickerName}</strong> (${t.zone})</div>
+                          <div class="pt-1 flex justify-between items-center">
+                            <button onclick="window.flowforge.openReassign(state.tasks.find(x => x.id === '${t.id}'))" class="text-cyan-400 text-[11px] hover:underline">🔄 Reassign</button>
+                            ${st !== 'Quality Check' ? `
+                              <button onclick="window.flowforge.advanceTask('${t.id}')" class="px-2 py-0.5 rounded bg-slate-800 text-[10px] text-slate-300">Advance →</button>
+                            ` : ''}
+                          </div>
+                        </div>
+                      `).join('')}
+                    </div>
+                  </div>
+                `;
+              }).join('')}
+            </div>
+          </div>
+        `;
+      }
+
+      function renderExceptions() {
+        return `
+          <div class="space-y-4">
+            ${state.exceptions.map(ex => `
+              <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <span class="font-mono text-rose-400 font-bold">${ex.id} • ${ex.sku} (${ex.skuName})</span>
+                  <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-950 text-rose-300 border border-rose-800">${ex.status}</span>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+                  <div class="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                    <span class="font-bold text-slate-400">1. Issue:</span>
+                    <p class="text-slate-300 mt-1">${ex.issueDescription}</p>
+                  </div>
+                  <div class="p-3 rounded-xl bg-cyan-950/30 border border-cyan-900">
+                    <span class="font-bold text-cyan-400">2. System Decision:</span>
+                    <p class="text-slate-200 mt-1">${ex.systemDecision}</p>
+                  </div>
+                  <div class="p-3 rounded-xl bg-emerald-950/30 border border-emerald-900 flex flex-col justify-between">
+                    <div>
+                      <span class="font-bold text-emerald-400">3. Resolution:</span>
+                      <p class="text-slate-200 mt-1">${ex.recommendedResolution}</p>
+                    </div>
+                    ${ex.status !== 'Resolved' ? `
+                      <div class="pt-2 flex justify-end space-x-2">
+                        <button
+                          onclick="window.flowforge.openException(state.exceptions.find(x => x.id === '${ex.id}'))"
+                          class="px-3 py-1.5 rounded-xl text-xs bg-slate-800 text-slate-300 hover:bg-slate-700"
+                        >
+                          Options
+                        </button>
+                        <button
+                          onclick="window.flowforge.confirmResolveException('${ex.id}')"
+                          class="px-3 py-1.5 rounded-xl text-xs font-bold bg-emerald-500 text-slate-950"
+                        >
+                          ⚡ Resolve
+                        </button>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+      }
+
+      function renderAnalytics() {
+        const hourlyData = [
+          { time: '06:00', val: 3 },
+          { time: '07:00', val: 8 },
+          { time: '08:00', val: 14 },
+          { time: '09:00', val: 19 },
+          { time: '10:00', val: 22 },
+          { time: '11:00', val: 17 },
+          { time: '12:00', val: 12 },
+        ];
+        const zones = [
+          { zone: 'Zone A1', name: 'Micro-Drive & Logic', delay: '6.2m', sla: '98.4%' },
+          { zone: 'Zone A2', name: 'Sensors & Circuitry', delay: '7.8m', sla: '96.1%' },
+          { zone: 'Zone B1', name: 'Actuators & Rails', delay: '8.5m', sla: '95.0%' },
+          { zone: 'Zone B2', name: 'Heavy Hydraulics & Conveyors', delay: '24.2m', sla: '78.5%' },
+          { zone: 'Zone C1', name: 'High-Density Network & RFID', delay: '5.1m', sla: '99.2%' },
+        ];
+        return `
+          <div class="space-y-6">
+            <div class="p-5 rounded-2xl bg-gradient-to-r from-slate-900 via-rose-950/30 to-cyan-950/30 border border-rose-700/60 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <h3 class="font-mono text-sm font-bold text-rose-200">Bottleneck Insight: Zone B2 Delay (18 min)</h3>
+                <p class="text-xs text-slate-300 mt-1">Zone B2 pickers are overloaded. Reassigning 2 pending tasks to Zone A1 restores nominal balance.</p>
+              </div>
+              <button
+                onclick="window.flowforge.confirmReassign('TSK-201', 'PCK-02')"
+                class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950 shrink-0 font-mono"
+              >
+                ⚡ 1-Click Zone Optimization
+              </button>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-4">
+                <h3 class="font-mono text-sm font-bold text-slate-100">Hourly Fulfillment Throughput</h3>
+                <div class="grid grid-cols-7 gap-2 h-44 items-end">
+                  ${hourlyData.map(d => `
+                    <div class="flex flex-col items-center space-y-1">
+                      <div style="height: ${(d.val / 25 * 120)}px" class="w-full bg-cyan-500 rounded-t"></div>
+                      <span class="text-[10px] text-slate-400 font-mono">${d.time}</span>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+
+              <div class="p-6 rounded-2xl bg-slate-900 border border-slate-800 space-y-3">
+                <h3 class="font-mono text-sm font-bold text-slate-100">Zone Performance & Latency</h3>
+                ${zones.map(z => `
+                  <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex justify-between items-center text-xs">
+                    <div>
+                      <span class="font-mono font-bold text-slate-200">${z.zone}</span>
+                      <span class="text-slate-400 ml-2">(${z.name})</span>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                      <span class="font-mono text-slate-400">${z.delay} delay</span>
+                      <span class="font-mono text-cyan-400 font-bold">${z.sla} SLA</span>
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // --- MODALS RENDERER ---
+      function renderModals() {
+        const root = document.getElementById('modal-root');
+        if (!root) return;
+
+        let content = '';
+
+        // 1. Order Detail Modal
+        if (state.selectedOrder) {
+          const o = state.selectedOrder;
+          content = `
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto">
+              <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-3xl w-full p-6 space-y-5 max-h-[90vh] overflow-y-auto custom-scrollbar">
+                <div class="flex justify-between items-center pb-3 border-b border-slate-800">
+                  <div class="flex items-center space-x-3">
+                    <span class="font-mono font-bold text-lg text-slate-100">${o.id}</span>
+                    <span class="px-2 py-0.5 rounded text-xs font-semibold bg-rose-950 text-rose-300 border border-rose-800">${o.priority}</span>
+                    <span class="px-2 py-0.5 rounded text-xs font-semibold bg-purple-950 text-purple-300 border border-purple-800">${o.customerTier} Tier</span>
+                  </div>
+                  <button onclick="window.flowforge.closeModal()" class="text-slate-400 hover:text-slate-200">✕</button>
+                </div>
+
+                <div class="p-4 rounded-xl bg-slate-950/70 border border-cyan-900/40 space-y-2">
+                  <div class="flex justify-between items-center text-xs">
+                    <span class="text-cyan-400 font-bold">⚡ AI Priority Score: ${o.priorityScore}/100</span>
+                    <span class="text-slate-400">SLA Deadline: <strong class="text-slate-200">${o.slaDeadline}</strong></span>
+                  </div>
+                  <div class="grid grid-cols-4 gap-2 text-[11px] pt-1">
+                    <div class="p-2 rounded bg-slate-900 border border-slate-800">Tier: <strong class="text-cyan-300">+${o.priorityFactors.tierScore} pts</strong></div>
+                    <div class="p-2 rounded bg-slate-900 border border-slate-800">SLA: <strong class="text-rose-400">+${o.priorityFactors.slaScore} pts</strong></div>
+                    <div class="p-2 rounded bg-slate-900 border border-slate-800">Value: <strong class="text-emerald-400">+${o.priorityFactors.valueScore} pts</strong></div>
+                    <div class="p-2 rounded bg-slate-900 border border-slate-800">Urgency: <strong class="text-amber-400">+${o.priorityFactors.urgencyScore} pts</strong></div>
+                  </div>
+                </div>
+
+                <div class="space-y-2">
+                  <h4 class="text-xs font-bold text-slate-300 uppercase">Order Line Items (${o.items.length})</h4>
+                  <table class="w-full text-xs text-left">
+                    <thead class="bg-slate-950 text-slate-400 border-b border-slate-800 font-mono text-[10px]">
+                      <tr>
+                        <th class="py-2 px-3">SKU</th>
+                        <th class="py-2 px-3">Description</th>
+                        <th class="py-2 px-3 text-center">Alloc / Req</th>
+                        <th class="py-2 px-3 text-right">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-800/60 font-mono">
+                      ${o.items.map(it => `
+                        <tr>
+                          <td class="py-2 px-3 text-cyan-400 font-bold">${it.sku}</td>
+                          <td class="py-2 px-3 font-sans text-slate-300">${it.name}</td>
+                          <td class="py-2 px-3 text-center font-bold text-emerald-400">${it.quantityAllocated} / ${it.quantityRequested}</td>
+                          <td class="py-2 px-3 text-right text-slate-200">${formatCurrency(it.unitPrice * it.quantityRequested)}</td>
+                        </tr>
+                      `).join('')}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div class="space-y-2 pt-2 border-t border-slate-800">
+                  <h4 class="text-xs font-bold text-slate-400 uppercase">Audit Trail & System Events</h4>
+                  <div class="space-y-1 text-xs text-slate-300">
+                    ${o.history.map(h => `
+                      <div class="flex items-center space-x-2 text-[11px]">
+                        <span class="font-mono text-slate-500">${h.timestamp}</span>
+                        <span>•</span>
+                        <span class="text-cyan-300 font-mono">[${h.actor}]</span>
+                        <span>${h.event}</span>
+                      </div>
+                    `).join('')}
+                  </div>
+                </div>
+
+                <div class="flex justify-between items-center pt-3 border-t border-slate-800">
+                  <div class="text-xs text-slate-400">Total: <strong class="text-cyan-400 font-mono text-sm">${formatCurrency(o.totalValue)}</strong></div>
+                  <div class="flex space-x-2">
+                    <button onclick="window.flowforge.closeModal()" class="px-4 py-2 rounded-xl bg-slate-800 text-xs">Close</button>
+                    ${o.fulfillmentStatus !== 'Dispatched' ? `
+                      <button onclick="window.flowforge.advanceOrder('${o.id}')" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-500 text-slate-950">⚡ Advance Workflow</button>
+                    ` : ''}
+                  </div>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 2. Reorder Modal
+        else if (state.reorderItem) {
+          const item = state.reorderItem;
+          content = `
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+              <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-full space-y-4">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <h3 class="font-mono font-bold text-slate-100">Restock ${item.sku}</h3>
+                  <button onclick="window.flowforge.closeModal()" class="text-slate-400">✕</button>
+                </div>
+                <div class="text-xs text-slate-300 space-y-1">
+                  <div><strong>${item.name}</strong></div>
+                  <div>On Hand: ${item.onHand} • Reserved: ${item.reserved} • Available: ${item.available}</div>
+                  <div>Lead Time: <strong>${item.leadTimeDays} Business Days</strong></div>
+                </div>
+                <div>
+                  <label class="text-xs font-semibold text-slate-300 block mb-1">Batch Quantity:</label>
+                  <input
+                    type="number"
+                    min="5"
+                    max="500"
+                    step="5"
+                    value="${state.reorderQty}"
+                    oninput="state.reorderQty = parseInt(this.value) || 20;"
+                    class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 font-mono text-cyan-300 text-xs"
+                  />
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                  <button onclick="window.flowforge.closeModal()" class="px-3 py-1.5 rounded bg-slate-800 text-xs">Cancel</button>
+                  <button
+                    onclick="window.flowforge.confirmReorder('${item.sku}', state.reorderQty)"
+                    class="px-4 py-1.5 rounded text-xs font-bold bg-cyan-500 text-slate-950"
+                  >
+                    Confirm Restock
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 3. Reassign Modal
+        else if (state.reassignTask) {
+          const t = state.reassignTask;
+          content = `
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+              <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <h3 class="font-mono font-bold text-slate-100">Reassign ${t.id}</h3>
+                  <button onclick="window.flowforge.closeModal()" class="text-slate-400">✕</button>
+                </div>
+                <div class="text-xs text-slate-300">
+                  Order: <strong class="text-slate-100">${t.orderId}</strong> (${t.customerName}) • Current: <strong class="text-amber-300">${t.pickerName}</strong> (${t.zone})
+                </div>
+                <div class="space-y-2">
+                  <label class="text-xs font-semibold text-slate-300 block">Select Available Alternative Picker:</label>
+                  ${state.pickers.filter(p => p.id !== t.pickerId).map(p => `
+                    <div
+                      onclick="state.selectedPickerTarget = '${p.id}'; renderModals();"
+                      class="p-3 rounded-xl border text-xs cursor-pointer flex justify-between items-center ${state.selectedPickerTarget === p.id ? 'bg-cyan-950/40 border-cyan-500' : 'bg-slate-950/60 border-slate-800'}"
+                    >
+                      <div>
+                        <div class="font-bold text-slate-100">${p.name} <span class="font-normal text-slate-400">(Zone ${p.zone})</span></div>
+                        <div class="text-[11px] text-slate-400">Load: ${p.activeTasks}/4 tasks • Efficiency: <span class="text-emerald-400 font-mono font-bold">${p.efficiencyRating}%</span></div>
+                      </div>
+                      <span class="px-2 py-0.5 rounded text-[10px] bg-emerald-950 text-emerald-300 border border-emerald-800">${p.currentStatus}</span>
+                    </div>
+                  `).join('')}
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                  <button onclick="window.flowforge.closeModal()" class="px-3 py-1.5 rounded bg-slate-800 text-xs">Cancel</button>
+                  <button
+                    onclick="window.flowforge.confirmReassign('${t.id}', state.selectedPickerTarget)"
+                    class="px-4 py-1.5 rounded text-xs font-bold bg-cyan-500 text-slate-950"
+                  >
+                    Confirm Reassignment
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        // 4. Resolve Exception Modal
+        else if (state.resolveException) {
+          const ex = state.resolveException;
+          content = `
+            <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+              <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-lg w-full space-y-4">
+                <div class="flex justify-between items-center pb-2 border-b border-slate-800">
+                  <h3 class="font-mono font-bold text-slate-100">Resolve Exception ${ex.id}</h3>
+                  <button onclick="window.flowforge.closeModal()" class="text-slate-400">✕</button>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 text-xs space-y-1">
+                  <div class="font-bold text-slate-200">${ex.sku} — ${ex.skuName}</div>
+                  <p class="text-rose-300">${ex.issueDescription}</p>
+                </div>
+                <div class="space-y-2">
+                  <div
+                    onclick="state.resolveOption = 'recommended'; renderModals();"
+                    class="p-3 rounded-xl border text-xs cursor-pointer ${state.resolveOption === 'recommended' ? 'bg-cyan-950/40 border-cyan-500' : 'bg-slate-950 border-slate-800'}"
+                  >
+                    <div class="font-bold text-cyan-300">Option A: FlowForge Recommended (Instant)</div>
+                    <p class="text-slate-300 mt-0.5">${ex.recommendedResolution}</p>
+                  </div>
+                  <div
+                    onclick="state.resolveOption = 'manual'; renderModals();"
+                    class="p-3 rounded-xl border text-xs cursor-pointer ${state.resolveOption === 'manual' ? 'bg-cyan-950/40 border-cyan-500' : 'bg-slate-950 border-slate-800'}"
+                  >
+                    <div class="font-bold text-slate-200">Option B: Hold for Supervisor Physical Audit</div>
+                    <p class="text-slate-400 mt-0.5">Quarantine line item and hold order. Estimated 4 hour delay.</p>
+                  </div>
+                </div>
+                <div class="flex justify-end space-x-2 pt-2">
+                  <button onclick="window.flowforge.closeModal()" class="px-3 py-1.5 rounded bg-slate-800 text-xs">Cancel</button>
+                  <button
+                    onclick="window.flowforge.confirmResolveException('${ex.id}')"
+                    class="px-4 py-1.5 rounded text-xs font-bold bg-cyan-500 text-slate-950"
+                  >
+                    Execute Resolution
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        root.innerHTML = content;
+      }
+
+      // Initial Mount
+      document.addEventListener('DOMContentLoaded', () => {
+        renderApp();
+      });
+      if (document.readyState !== 'loading') {
+        renderApp();
+      }
+    })();
+  </script>
+</body>
+</html>
